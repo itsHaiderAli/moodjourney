@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "./ui/button";
 import { Heart } from "lucide-react";
+import { ThemeToggle } from "./ThemeToggle";
 
 const Navbar = () => {
   const { user, logout } = useAuth();
@@ -16,6 +17,7 @@ const Navbar = () => {
         </Link>
         
         <div className="flex items-center space-x-4">
+          <ThemeToggle />
           {user ? (
             <>
               <Link to="/dashboard">
