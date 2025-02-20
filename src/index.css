@@ -49,6 +49,5 @@
 }
 
 .hover-scale {
-  @apply transition-transform duration-200 hover:scale-102;
+  @apply transition-transform duration-200 hover:scale-105;
 }
-
