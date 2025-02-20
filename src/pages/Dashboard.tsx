@@ -1,4 +1,5 @@
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,23 +20,25 @@ import {
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
-import { format } from "date-fns";
+import { format, subDays } from "date-fns";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { Activity, Brain, Calendar, ChartBar, Heart, Smile, User } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
-const moodData = [
-  { date: "2024-02-14", mood: 8, energy: 7 },
-  { date: "2024-02-15", mood: 6, energy: 5 },
-  { date: "2024-02-16", mood: 9, energy: 8 },
-  { date: "2024-02-17", mood: 7, energy: 6 },
-  { date: "2024-02-18", mood: 8, energy: 7 },
-  { date: "2024-02-19", mood: 9, energy: 9 },
-  { date: "2024-02-20", mood: 8, energy: 8 },
-].map(item => ({
-  ...item,
-  date: format(new Date(item.date), "MMM dd"),
-}));
+interface MoodEntry {
+  date: string;
+  mood: number;
+  energy: number;
+  note?: string;
+}
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -44,12 +47,168 @@ const Dashboard = () => {
   const [energyLevel, setEnergyLevel] = useState([7]);
   const [note, setNote] = useState("");
   const [activities, setActivities] = useState<string[]>([]);
+  const [moodHistory, setMoodHistory] = useState<MoodEntry[]>([]);
+  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [averageMood, setAverageMood] = useState(0);
+  const [totalEntries, setTotalEntries] = useState(0);
+  const [currentStreak, setCurrentStreak] = useState(0);
+
+  // Initialize with some recent data
+  useEffect(() => {
+    generateInitialMoodData();
+  }, []);
+
+  const generateInitialMoodData = () => {
+    const last7Days = Array.from({ length: 7 }, (_, i) => {
+      const date = subDays(new Date(), i);
+      return {
+        date: format(date, "MMM dd"),
+        mood: Math.floor(Math.random() * 5) + 5, // Random mood between 5-10
+        energy: Math.floor(Math.random() * 5) + 4, // Random energy between 4-9
+      };
+    }).reverse();
+
+    setMoodHistory(last7Days);
+    updateStats(last7Days);
+  };
+
+  const updateStats = (history: MoodEntry[]) => {
+    const avgMood = history.reduce((sum, entry) => sum + entry.mood, 0) / history.length;
+    setAverageMood(Number(avgMood.toFixed(1)));
+    setTotalEntries(history.length);
+    setCurrentStreak(calculateStreak(history));
+  };
+
+  const calculateStreak = (history: MoodEntry[]) => {
+    let streak = 0;
+    const today = new Date();
+    for (let i = 0; i < history.length; i++) {
+      if (i === 0 || history[i].date !== format(subDays(today, i), "MMM dd")) {
+        break;
+      }
+      streak++;
+    }
+    return streak;
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    const newEntry: MoodEntry = {
+      date: format(new Date(), "MMM dd"),
+      mood: intensity[0],
+      energy: energyLevel[0],
+      note: note,
+    };
+
+    const updatedHistory = [newEntry, ...moodHistory.slice(0, 6)];
+    setMoodHistory(updatedHistory);
+    updateStats(updatedHistory);
+
     toast.success("Mood logged successfully!");
     setNote("");
+    setIntensity([5]);
+    setEnergyLevel([7]);
   };
+
+  const MoodCalendar = () => (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="outline" className="hover-scale">
+          <Calendar className="mr-2 h-4 w-4" />
+          View Calendar
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Mood Calendar</DialogTitle>
+          <DialogDescription>
+            Your mood entries for the past week
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          {moodHistory.map((entry, index) => (
+            <div key={index} className="flex items-center justify-between px-4 py-2 bg-secondary/10 rounded-lg">
+              <span>{entry.date}</span>
+              <div className="flex gap-4">
+                <span>Mood: {entry.mood}/10</span>
+                <span>Energy: {entry.energy}/10</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+
+  const AnalyticsDialog = () => (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="outline" className="hover-scale">
+          <ChartBar className="mr-2 h-4 w-4" />
+          Analytics
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[625px]">
+        <DialogHeader>
+          <DialogTitle>Mood Analytics</DialogTitle>
+          <DialogDescription>
+            Detailed analysis of your mood patterns
+          </DialogDescription>
+        </DialogHeader>
+        <div className="mt-4 space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Mood Distribution</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[200px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={moodHistory}>
+                    <XAxis dataKey="date" />
+                    <YAxis domain={[0, 10]} />
+                    <Tooltip />
+                    <Area 
+                      type="monotone" 
+                      dataKey="mood" 
+                      stroke="hsl(var(--primary))" 
+                      fill="hsl(var(--primary))" 
+                      fillOpacity={0.2}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <div className="grid grid-cols-3 gap-4">
+            <Card>
+              <CardHeader className="p-4">
+                <CardTitle className="text-sm">Weekly Average</CardTitle>
+                <p className="text-2xl font-bold">{averageMood}</p>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="p-4">
+                <CardTitle className="text-sm">Best Day</CardTitle>
+                <p className="text-2xl font-bold">
+                  {Math.max(...moodHistory.map(entry => entry.mood))}/10
+                </p>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="p-4">
+                <CardTitle className="text-sm">Consistency</CardTitle>
+                <p className="text-2xl font-bold">
+                  {((totalEntries / 7) * 100).toFixed(0)}%
+                </p>
+              </CardHeader>
+            </Card>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -59,14 +218,8 @@ const Dashboard = () => {
           <p className="text-muted-foreground">Track and manage your emotional wellbeing</p>
         </div>
         <div className="flex items-center space-x-4">
-          <Button variant="outline" className="hover-scale">
-            <Calendar className="mr-2 h-4 w-4" />
-            View Calendar
-          </Button>
-          <Button variant="outline" className="hover-scale">
-            <ChartBar className="mr-2 h-4 w-4" />
-            Analytics
-          </Button>
+          <MoodCalendar />
+          <AnalyticsDialog />
         </div>
       </div>
       
@@ -146,7 +299,7 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={moodData}>
+                <AreaChart data={moodHistory}>
                   <defs>
                     <linearGradient id="colorMood" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.8}/>
@@ -186,7 +339,7 @@ const Dashboard = () => {
                   <Brain className="h-4 w-4 text-primary" />
                   <CardTitle className="text-sm">Average Mood</CardTitle>
                 </div>
-                <p className="text-2xl font-bold">7.8</p>
+                <p className="text-2xl font-bold">{averageMood}</p>
               </CardHeader>
             </Card>
             <Card className="hover-scale">
@@ -195,7 +348,7 @@ const Dashboard = () => {
                   <Activity className="h-4 w-4 text-primary" />
                   <CardTitle className="text-sm">Entries</CardTitle>
                 </div>
-                <p className="text-2xl font-bold">24</p>
+                <p className="text-2xl font-bold">{totalEntries}</p>
               </CardHeader>
             </Card>
             <Card className="hover-scale">
@@ -204,7 +357,7 @@ const Dashboard = () => {
                   <Smile className="h-4 w-4 text-primary" />
                   <CardTitle className="text-sm">Streak</CardTitle>
                 </div>
-                <p className="text-2xl font-bold">5</p>
+                <p className="text-2xl font-bold">{currentStreak}</p>
               </CardHeader>
             </Card>
           </div>
