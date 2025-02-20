@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -23,9 +22,8 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart,
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
-import { Brain, Calendar, ChartBar, Heart, Smile, User } from "lucide-react";
+import { Activity, Brain, Calendar, ChartBar, Heart, Smile, User } from "lucide-react";
 
-// Dummy data for the mood chart
 const moodData = [
   { date: "2024-02-14", mood: 8, energy: 7 },
   { date: "2024-02-15", mood: 6, energy: 5 },
