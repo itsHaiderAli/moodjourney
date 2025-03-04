@@ -1,3 +1,4 @@
+
 #root {
   max-width: 1280px;
   margin: 0 auto;
@@ -35,8 +36,18 @@
 
 .card {
   padding: 2em;
+  background: rgba(30, 30, 35, 0.6);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius);
 }
 
 .read-the-docs {
-  color: #888;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+body {
+  background-color: #1A1F2C;
+  color: #ffffff;
+  overflow-y: scroll;
 }

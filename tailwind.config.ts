@@ -45,8 +45,8 @@ export default {
           foreground: "hsl(var(--accent-foreground))",
         },
         card: {
-          DEFAULT: "rgba(255, 255, 255, 0.8)",
-          foreground: "#1F2937",
+          DEFAULT: "rgba(30, 30, 35, 0.8)",
+          foreground: "#FFFFFF",
         },
       },
       keyframes: {
