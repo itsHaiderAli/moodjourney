@@ -11,21 +11,15 @@ import { toast } from "sonner";
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, loading } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      setLoading(true);
       await login({ email, password });
-      toast.success("Welcome back!");
-      navigate("/dashboard");
     } catch (error) {
-      toast.error("Failed to login. Please try again.");
-    } finally {
-      setLoading(false);
+      // Error handling is done in the AuthContext
     }
   };
 

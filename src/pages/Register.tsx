@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -9,8 +10,7 @@ import { Heart, Loader2, Mail, Lock, User } from "lucide-react";
 import { toast } from "sonner";
 
 const Register = () => {
-  const { register } = useAuth();
-  const [loading, setLoading] = useState(false);
+  const { register, loading } = useAuth();
   const [formData, setFormData] = useState({
     username: "",
     email: "",
@@ -25,7 +25,6 @@ const Register = () => {
       toast.error("Passwords do not match!");
       return;
     }
-    setLoading(true);
     try {
       await register({ 
         username: formData.username,
@@ -33,9 +32,7 @@ const Register = () => {
         password: formData.password 
       });
     } catch (error) {
-      console.error("Registration error:", error);
-    } finally {
-      setLoading(false);
+      // Error handling is done in the AuthContext
     }
   };
 

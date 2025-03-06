@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -20,9 +19,8 @@ import {
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
-import { format, subDays } from "date-fns";
+import { format, subDays, parseISO } from "date-fns";
 import { toast } from "sonner";
-import { motion } from "framer-motion";
 import { Activity, Brain, Calendar, ChartBar, Heart, Smile, User } from "lucide-react";
 import {
   Dialog,
@@ -32,47 +30,71 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { supabase } from "@/integrations/supabase/client";
 
 interface MoodEntry {
+  id?: string;
   date: string;
   mood: number;
   energy: number;
   note?: string;
+  mood_name?: string;
 }
 
 const Dashboard = () => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [mood, setMood] = useState("happy");
   const [intensity, setIntensity] = useState([5]);
   const [energyLevel, setEnergyLevel] = useState([7]);
   const [note, setNote] = useState("");
-  const [activities, setActivities] = useState<string[]>([]);
   const [moodHistory, setMoodHistory] = useState<MoodEntry[]>([]);
-  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [averageMood, setAverageMood] = useState(0);
   const [totalEntries, setTotalEntries] = useState(0);
   const [currentStreak, setCurrentStreak] = useState(0);
 
-  // Initialize with some recent data
   useEffect(() => {
-    generateInitialMoodData();
-  }, []);
+    if (user) {
+      fetchMoodEntries();
+    }
+  }, [user]);
 
-  const generateInitialMoodData = () => {
-    const last7Days = Array.from({ length: 7 }, (_, i) => {
-      const date = subDays(new Date(), i);
-      return {
-        date: format(date, "MMM dd"),
-        mood: Math.floor(Math.random() * 5) + 5, // Random mood between 5-10
-        energy: Math.floor(Math.random() * 5) + 4, // Random energy between 4-9
-      };
-    }).reverse();
+  const fetchMoodEntries = async () => {
+    try {
+      setLoading(true);
+      
+      const { data, error } = await supabase
+        .from('mood_entries')
+        .select('*')
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
 
-    setMoodHistory(last7Days);
-    updateStats(last7Days);
+      if (error) throw error;
+
+      const formattedData = data.map(entry => ({
+        id: entry.id,
+        date: format(parseISO(entry.created_at), "MMM dd"),
+        mood: entry.intensity,
+        energy: entry.energy,
+        note: entry.note,
+        mood_name: entry.mood
+      }));
+
+      setMoodHistory(formattedData);
+      updateStats(formattedData);
+    } catch (error) {
+      console.error('Error fetching mood entries:', error);
+      toast.error("Failed to load mood entries");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const updateStats = (history: MoodEntry[]) => {
+    if (history.length === 0) return;
+    
     const avgMood = history.reduce((sum, entry) => sum + entry.mood, 0) / history.length;
     setAverageMood(Number(avgMood.toFixed(1)));
     setTotalEntries(history.length);
@@ -82,6 +104,7 @@ const Dashboard = () => {
   const calculateStreak = (history: MoodEntry[]) => {
     let streak = 0;
     const today = new Date();
+    
     for (let i = 0; i < history.length; i++) {
       if (i === 0 || history[i].date !== format(subDays(today, i), "MMM dd")) {
         break;
@@ -91,24 +114,45 @@ const Dashboard = () => {
     return streak;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const newEntry: MoodEntry = {
-      date: format(new Date(), "MMM dd"),
-      mood: intensity[0],
-      energy: energyLevel[0],
-      note: note,
-    };
+    if (!user) {
+      toast.error("You must be logged in to log your mood");
+      return;
+    }
+    
+    try {
+      setSubmitting(true);
+      
+      const { data, error } = await supabase
+        .from('mood_entries')
+        .insert([
+          { 
+            user_id: user.id,
+            mood: mood,
+            intensity: intensity[0],
+            energy: energyLevel[0],
+            note: note
+          }
+        ])
+        .select();
 
-    const updatedHistory = [newEntry, ...moodHistory.slice(0, 6)];
-    setMoodHistory(updatedHistory);
-    updateStats(updatedHistory);
-
-    toast.success("Mood logged successfully!");
-    setNote("");
-    setIntensity([5]);
-    setEnergyLevel([7]);
+      if (error) throw error;
+      
+      toast.success("Mood logged successfully!");
+      
+      fetchMoodEntries();
+      
+      setNote("");
+      setIntensity([5]);
+      setEnergyLevel([7]);
+    } catch (error) {
+      console.error('Error logging mood:', error);
+      toast.error("Failed to log mood. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const MoodCalendar = () => (
@@ -192,7 +236,7 @@ const Dashboard = () => {
               <CardHeader className="p-4">
                 <CardTitle className="text-sm">Best Day</CardTitle>
                 <p className="text-2xl font-bold">
-                  {Math.max(...moodHistory.map(entry => entry.mood))}/10
+                  {moodHistory.length > 0 ? Math.max(...moodHistory.map(entry => entry.mood)) : 0}/10
                 </p>
               </CardHeader>
             </Card>
@@ -214,7 +258,7 @@ const Dashboard = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold">Welcome back, {user?.email}</h1>
+          <h1 className="text-3xl font-bold">Welcome back, {profile?.username || user?.email}</h1>
           <p className="text-muted-foreground">Track and manage your emotional wellbeing</p>
         </div>
         <div className="flex items-center space-x-4">
@@ -224,7 +268,6 @@ const Dashboard = () => {
       </div>
       
       <div className="grid gap-6 md:grid-cols-2">
-        {/* Mood Logging Form */}
         <Card className="animate-in">
           <CardHeader>
             <CardTitle>Log Your Mood</CardTitle>
@@ -283,14 +326,13 @@ const Dashboard = () => {
                 />
               </div>
               
-              <Button type="submit" className="w-full hover-scale">
-                Log Mood
+              <Button type="submit" className="w-full hover-scale" disabled={submitting}>
+                {submitting ? "Logging..." : "Log Mood"}
               </Button>
             </form>
           </CardContent>
         </Card>
 
-        {/* Mood Trends Chart */}
         <div className="space-y-6">
           <Card className="animate-in">
             <CardHeader>
@@ -298,37 +340,47 @@ const Dashboard = () => {
               <CardDescription>Your mood patterns over time</CardDescription>
             </CardHeader>
             <CardContent className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={moodHistory}>
-                  <defs>
-                    <linearGradient id="colorMood" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
-                    </linearGradient>
-                    <linearGradient id="colorEnergy" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--secondary))" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="hsl(var(--secondary))" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <XAxis dataKey="date" />
-                  <YAxis domain={[0, 10]} />
-                  <Tooltip />
-                  <Area 
-                    type="monotone" 
-                    dataKey="mood" 
-                    stroke="hsl(var(--primary))" 
-                    fillOpacity={1} 
-                    fill="url(#colorMood)" 
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="energy" 
-                    stroke="hsl(var(--secondary))" 
-                    fillOpacity={1} 
-                    fill="url(#colorEnergy)" 
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+              {loading ? (
+                <div className="flex items-center justify-center h-full">
+                  <p>Loading your mood data...</p>
+                </div>
+              ) : moodHistory.length === 0 ? (
+                <div className="flex items-center justify-center h-full">
+                  <p>No mood data yet. Start logging your moods!</p>
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={moodHistory}>
+                    <defs>
+                      <linearGradient id="colorMood" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                      </linearGradient>
+                      <linearGradient id="colorEnergy" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(var(--secondary))" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="hsl(var(--secondary))" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="date" />
+                    <YAxis domain={[0, 10]} />
+                    <Tooltip />
+                    <Area 
+                      type="monotone" 
+                      dataKey="mood" 
+                      stroke="hsl(var(--primary))" 
+                      fillOpacity={1} 
+                      fill="url(#colorMood)" 
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="energy" 
+                      stroke="hsl(var(--secondary))" 
+                      fillOpacity={1} 
+                      fill="url(#colorEnergy)" 
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
             </CardContent>
           </Card>
 
