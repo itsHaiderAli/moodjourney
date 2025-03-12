@@ -39,6 +39,102 @@ export type Database = {
         }
         Relationships: []
       }
+      mood_entry_tags: {
+        Row: {
+          mood_entry_id: string
+          tag_id: string
+        }
+        Insert: {
+          mood_entry_id: string
+          tag_id: string
+        }
+        Update: {
+          mood_entry_id?: string
+          tag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mood_entry_tags_mood_entry_id_fkey"
+            columns: ["mood_entry_id"]
+            isOneToOne: false
+            referencedRelation: "mood_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mood_entry_tags_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "mood_tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mood_goals: {
+        Row: {
+          completed: boolean
+          created_at: string
+          description: string | null
+          end_date: string | null
+          id: string
+          start_date: string
+          target_energy: number | null
+          target_mood: number | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed?: boolean
+          created_at?: string
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          start_date?: string
+          target_energy?: number | null
+          target_mood?: number | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed?: boolean
+          created_at?: string
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          start_date?: string
+          target_energy?: number | null
+          target_mood?: number | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      mood_tags: {
+        Row: {
+          category: Database["public"]["Enums"]["trigger_category"]
+          created_at: string
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          category: Database["public"]["Enums"]["trigger_category"]
+          created_at?: string
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["trigger_category"]
+          created_at?: string
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -71,7 +167,15 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      trigger_category:
+        | "activity"
+        | "person"
+        | "location"
+        | "weather"
+        | "health"
+        | "work"
+        | "social"
+        | "other"
     }
     CompositeTypes: {
       [_ in never]: never

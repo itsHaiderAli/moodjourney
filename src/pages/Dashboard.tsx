@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -21,7 +22,7 @@ import { Slider } from "@/components/ui/slider";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { format, subDays, parseISO } from "date-fns";
 import { toast } from "sonner";
-import { Activity, Brain, Calendar, ChartBar, Heart, Smile, User } from "lucide-react";
+import { Activity, Brain, Calendar, ChartBar, Heart, Smile, User, FileText, Flag } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -31,15 +32,16 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
-
-interface MoodEntry {
-  id?: string;
-  date: string;
-  mood: number;
-  energy: number;
-  note?: string;
-  mood_name?: string;
-}
+import { MoodEntry, MoodTag } from "@/types/mood";
+import TagsInput from "@/components/TagsInput";
+import GoalManager from "@/components/GoalManager";
+import ExportReports from "@/components/ExportReports";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 
 const Dashboard = () => {
   const { user, profile } = useAuth();
@@ -47,12 +49,14 @@ const Dashboard = () => {
   const [intensity, setIntensity] = useState([5]);
   const [energyLevel, setEnergyLevel] = useState([7]);
   const [note, setNote] = useState("");
+  const [selectedTags, setSelectedTags] = useState<MoodTag[]>([]);
   const [moodHistory, setMoodHistory] = useState<MoodEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [averageMood, setAverageMood] = useState(0);
   const [totalEntries, setTotalEntries] = useState(0);
   const [currentStreak, setCurrentStreak] = useState(0);
+  const [activeTab, setActiveTab] = useState("track");
 
   useEffect(() => {
     if (user) {
@@ -73,17 +77,46 @@ const Dashboard = () => {
 
       if (error) throw error;
 
-      const formattedData = data.map(entry => ({
-        id: entry.id,
-        date: format(parseISO(entry.created_at), "MMM dd"),
-        mood: entry.intensity,
-        energy: entry.energy,
-        note: entry.note,
-        mood_name: entry.mood
-      }));
+      // Fetch tags for each mood entry
+      const entryIds = data.map(entry => entry.id);
+      
+      const { data: tagRelations, error: tagRelError } = await supabase
+        .from('mood_entry_tags')
+        .select('mood_entry_id, tag_id')
+        .in('mood_entry_id', entryIds);
+        
+      if (tagRelError) throw tagRelError;
+      
+      const tagIds = tagRelations.map(rel => rel.tag_id);
+      
+      const { data: tags, error: tagsError } = await supabase
+        .from('mood_tags')
+        .select('*')
+        .in('id', tagIds);
+        
+      if (tagsError) throw tagsError;
 
-      setMoodHistory(formattedData);
-      updateStats(formattedData);
+      // Add tags to each entry
+      const entriesWithTags = data.map(entry => {
+        const entryTagIds = tagRelations
+          .filter(rel => rel.mood_entry_id === entry.id)
+          .map(rel => rel.tag_id);
+          
+        const entryTags = tags.filter(tag => entryTagIds.includes(tag.id));
+        
+        return {
+          id: entry.id,
+          date: format(parseISO(entry.created_at), "MMM dd"),
+          mood: entry.intensity,
+          energy: entry.energy,
+          note: entry.note,
+          mood_name: entry.mood,
+          tags: entryTags
+        };
+      });
+
+      setMoodHistory(entriesWithTags);
+      updateStats(entriesWithTags);
     } catch (error) {
       console.error('Error fetching mood entries:', error);
       toast.error("Failed to load mood entries");
@@ -125,6 +158,7 @@ const Dashboard = () => {
     try {
       setSubmitting(true);
       
+      // First create the mood entry
       const { data, error } = await supabase
         .from('mood_entries')
         .insert([
@@ -140,6 +174,21 @@ const Dashboard = () => {
 
       if (error) throw error;
       
+      // If there are selected tags, create the relationships
+      if (selectedTags.length > 0 && data && data[0]) {
+        const entryId = data[0].id;
+        const tagRelations = selectedTags.map(tag => ({
+          mood_entry_id: entryId,
+          tag_id: tag.id
+        }));
+        
+        const { error: tagError } = await supabase
+          .from('mood_entry_tags')
+          .insert(tagRelations);
+          
+        if (tagError) throw tagError;
+      }
+      
       toast.success("Mood logged successfully!");
       
       fetchMoodEntries();
@@ -147,6 +196,7 @@ const Dashboard = () => {
       setNote("");
       setIntensity([5]);
       setEnergyLevel([7]);
+      setSelectedTags([]);
     } catch (error) {
       console.error('Error logging mood:', error);
       toast.error("Failed to log mood. Please try again.");
@@ -267,154 +317,191 @@ const Dashboard = () => {
         </div>
       </div>
       
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card className="animate-in">
-          <CardHeader>
-            <CardTitle>Log Your Mood</CardTitle>
-            <CardDescription>How are you feeling right now?</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Select Mood</label>
-                <Select value={mood} onValueChange={setMood}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select your mood" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="happy">😊 Happy</SelectItem>
-                    <SelectItem value="sad">😢 Sad</SelectItem>
-                    <SelectItem value="angry">😠 Angry</SelectItem>
-                    <SelectItem value="excited">🤩 Excited</SelectItem>
-                    <SelectItem value="calm">😌 Calm</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Mood Intensity</label>
-                <Slider
-                  value={intensity}
-                  onValueChange={setIntensity}
-                  max={10}
-                  step={1}
-                />
-                <div className="text-sm text-muted-foreground text-center">
-                  {intensity[0]} / 10
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Energy Level</label>
-                <Slider
-                  value={energyLevel}
-                  onValueChange={setEnergyLevel}
-                  max={10}
-                  step={1}
-                />
-                <div className="text-sm text-muted-foreground text-center">
-                  {energyLevel[0]} / 10
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Notes</label>
-                <Textarea
-                  placeholder="Add any notes about your mood..."
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                />
-              </div>
-              
-              <Button type="submit" className="w-full hover-scale" disabled={submitting}>
-                {submitting ? "Logging..." : "Log Mood"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        <div className="space-y-6">
-          <Card className="animate-in">
-            <CardHeader>
-              <CardTitle>Mood Trends</CardTitle>
-              <CardDescription>Your mood patterns over time</CardDescription>
-            </CardHeader>
-            <CardContent className="h-[300px]">
-              {loading ? (
-                <div className="flex items-center justify-center h-full">
-                  <p>Loading your mood data...</p>
-                </div>
-              ) : moodHistory.length === 0 ? (
-                <div className="flex items-center justify-center h-full">
-                  <p>No mood data yet. Start logging your moods!</p>
-                </div>
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={moodHistory}>
-                    <defs>
-                      <linearGradient id="colorMood" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
-                      </linearGradient>
-                      <linearGradient id="colorEnergy" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(var(--secondary))" stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor="hsl(var(--secondary))" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <XAxis dataKey="date" />
-                    <YAxis domain={[0, 10]} />
-                    <Tooltip />
-                    <Area 
-                      type="monotone" 
-                      dataKey="mood" 
-                      stroke="hsl(var(--primary))" 
-                      fillOpacity={1} 
-                      fill="url(#colorMood)" 
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="grid grid-cols-3">
+          <TabsTrigger value="track" className="flex items-center">
+            <Heart className="mr-2 h-4 w-4" />
+            Track Mood
+          </TabsTrigger>
+          <TabsTrigger value="goals" className="flex items-center">
+            <Flag className="mr-2 h-4 w-4" />
+            Goals
+          </TabsTrigger>
+          <TabsTrigger value="reports" className="flex items-center">
+            <FileText className="mr-2 h-4 w-4" />
+            Reports
+          </TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="track">
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card className="animate-in">
+              <CardHeader>
+                <CardTitle>Log Your Mood</CardTitle>
+                <CardDescription>How are you feeling right now?</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Select Mood</label>
+                    <Select value={mood} onValueChange={setMood}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select your mood" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="happy">😊 Happy</SelectItem>
+                        <SelectItem value="sad">😢 Sad</SelectItem>
+                        <SelectItem value="angry">😠 Angry</SelectItem>
+                        <SelectItem value="excited">🤩 Excited</SelectItem>
+                        <SelectItem value="calm">😌 Calm</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Mood Intensity</label>
+                    <Slider
+                      value={intensity}
+                      onValueChange={setIntensity}
+                      max={10}
+                      step={1}
                     />
-                    <Area 
-                      type="monotone" 
-                      dataKey="energy" 
-                      stroke="hsl(var(--secondary))" 
-                      fillOpacity={1} 
-                      fill="url(#colorEnergy)" 
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              )}
-            </CardContent>
-          </Card>
+                    <div className="text-sm text-muted-foreground text-center">
+                      {intensity[0]} / 10
+                    </div>
+                  </div>
 
-          <div className="grid grid-cols-3 gap-4">
-            <Card className="hover-scale">
-              <CardHeader className="p-4">
-                <div className="flex items-center space-x-2">
-                  <Brain className="h-4 w-4 text-primary" />
-                  <CardTitle className="text-sm">Average Mood</CardTitle>
-                </div>
-                <p className="text-2xl font-bold">{averageMood}</p>
-              </CardHeader>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Energy Level</label>
+                    <Slider
+                      value={energyLevel}
+                      onValueChange={setEnergyLevel}
+                      max={10}
+                      step={1}
+                    />
+                    <div className="text-sm text-muted-foreground text-center">
+                      {energyLevel[0]} / 10
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Tags & Triggers</label>
+                    <TagsInput 
+                      selectedTags={selectedTags} 
+                      onTagsChange={setSelectedTags} 
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Notes</label>
+                    <Textarea
+                      placeholder="Add any notes about your mood..."
+                      value={note}
+                      onChange={(e) => setNote(e.target.value)}
+                    />
+                  </div>
+                  
+                  <Button type="submit" className="w-full hover-scale" disabled={submitting}>
+                    {submitting ? "Logging..." : "Log Mood"}
+                  </Button>
+                </form>
+              </CardContent>
             </Card>
-            <Card className="hover-scale">
-              <CardHeader className="p-4">
-                <div className="flex items-center space-x-2">
-                  <Activity className="h-4 w-4 text-primary" />
-                  <CardTitle className="text-sm">Entries</CardTitle>
-                </div>
-                <p className="text-2xl font-bold">{totalEntries}</p>
-              </CardHeader>
-            </Card>
-            <Card className="hover-scale">
-              <CardHeader className="p-4">
-                <div className="flex items-center space-x-2">
-                  <Smile className="h-4 w-4 text-primary" />
-                  <CardTitle className="text-sm">Streak</CardTitle>
-                </div>
-                <p className="text-2xl font-bold">{currentStreak}</p>
-              </CardHeader>
-            </Card>
+
+            <div className="space-y-6">
+              <Card className="animate-in">
+                <CardHeader>
+                  <CardTitle>Mood Trends</CardTitle>
+                  <CardDescription>Your mood patterns over time</CardDescription>
+                </CardHeader>
+                <CardContent className="h-[300px]">
+                  {loading ? (
+                    <div className="flex items-center justify-center h-full">
+                      <p>Loading your mood data...</p>
+                    </div>
+                  ) : moodHistory.length === 0 ? (
+                    <div className="flex items-center justify-center h-full">
+                      <p>No mood data yet. Start logging your moods!</p>
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={moodHistory}>
+                        <defs>
+                          <linearGradient id="colorMood" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.8}/>
+                            <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                          </linearGradient>
+                          <linearGradient id="colorEnergy" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="hsl(var(--secondary))" stopOpacity={0.8}/>
+                            <stop offset="95%" stopColor="hsl(var(--secondary))" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <XAxis dataKey="date" />
+                        <YAxis domain={[0, 10]} />
+                        <Tooltip />
+                        <Area 
+                          type="monotone" 
+                          dataKey="mood" 
+                          stroke="hsl(var(--primary))" 
+                          fillOpacity={1} 
+                          fill="url(#colorMood)" 
+                        />
+                        <Area 
+                          type="monotone" 
+                          dataKey="energy" 
+                          stroke="hsl(var(--secondary))" 
+                          fillOpacity={1} 
+                          fill="url(#colorEnergy)" 
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  )}
+                </CardContent>
+              </Card>
+
+              <div className="grid grid-cols-3 gap-4">
+                <Card className="hover-scale">
+                  <CardHeader className="p-4">
+                    <div className="flex items-center space-x-2">
+                      <Brain className="h-4 w-4 text-primary" />
+                      <CardTitle className="text-sm">Average Mood</CardTitle>
+                    </div>
+                    <p className="text-2xl font-bold">{averageMood}</p>
+                  </CardHeader>
+                </Card>
+                <Card className="hover-scale">
+                  <CardHeader className="p-4">
+                    <div className="flex items-center space-x-2">
+                      <Activity className="h-4 w-4 text-primary" />
+                      <CardTitle className="text-sm">Entries</CardTitle>
+                    </div>
+                    <p className="text-2xl font-bold">{totalEntries}</p>
+                  </CardHeader>
+                </Card>
+                <Card className="hover-scale">
+                  <CardHeader className="p-4">
+                    <div className="flex items-center space-x-2">
+                      <Smile className="h-4 w-4 text-primary" />
+                      <CardTitle className="text-sm">Streak</CardTitle>
+                    </div>
+                    <p className="text-2xl font-bold">{currentStreak}</p>
+                  </CardHeader>
+                </Card>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        </TabsContent>
+        
+        <TabsContent value="goals" className="space-y-6">
+          <GoalManager averageMood={averageMood} />
+        </TabsContent>
+        
+        <TabsContent value="reports" className="space-y-6">
+          <div className="max-w-md mx-auto">
+            <ExportReports />
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
