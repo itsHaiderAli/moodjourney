@@ -105,15 +105,15 @@ const MoodTracker = ({ onSubmitSuccess }: MoodTrackerProps) => {
           <div className="space-y-2">
             <label className="text-sm font-medium">Select Mood</label>
             <Select value={mood} onValueChange={setMood}>
-              <SelectTrigger>
+              <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select your mood" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="happy">😊 Happy</SelectItem>
-                <SelectItem value="sad">😢 Sad</SelectItem>
-                <SelectItem value="angry">😠 Angry</SelectItem>
-                <SelectItem value="excited">🤩 Excited</SelectItem>
-                <SelectItem value="calm">😌 Calm</SelectItem>
+              <SelectContent className="bg-background border-border">
+                <SelectItem value="happy" className="hover:bg-accent">😊 Happy</SelectItem>
+                <SelectItem value="sad" className="hover:bg-accent">😢 Sad</SelectItem>
+                <SelectItem value="angry" className="hover:bg-accent">😠 Angry</SelectItem>
+                <SelectItem value="excited" className="hover:bg-accent">🤩 Excited</SelectItem>
+                <SelectItem value="calm" className="hover:bg-accent">😌 Calm</SelectItem>
               </SelectContent>
             </Select>
           </div>

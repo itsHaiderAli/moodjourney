@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -78,25 +77,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }
 
-  const login = async (data: LoginData) => {
-    try {
-      setLoading(true);
-      const { error } = await supabase.auth.signInWithPassword({
-        email: data.email,
-        password: data.password,
-      });
-
-      if (error) throw error;
-      navigate("/dashboard");
-      toast.success("Welcome back!");
-    } catch (error: any) {
-      console.error('Error logging in:', error);
-      toast.error(error.message || "Failed to login. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const register = async (data: RegisterData) => {
     try {
       setLoading(true);
@@ -107,15 +87,43 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           data: {
             username: data.username,
           },
+          emailRedirectTo: `${window.location.origin}/dashboard`,
         },
       });
 
       if (error) throw error;
-      navigate("/dashboard");
-      toast.success("Account created successfully!");
+      
+      toast.success("Registration successful! Please check your email to verify your account.");
+      // Don't navigate to dashboard immediately - wait for email verification
     } catch (error: any) {
       console.error('Error registering:', error);
       toast.error(error.message || "Failed to register. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const login = async (data: LoginData) => {
+    try {
+      setLoading(true);
+      const { error, data: authData } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password: data.password,
+      });
+
+      if (error) throw error;
+
+      if (!authData.user?.email_confirmed_at) {
+        toast.error("Please verify your email before logging in.");
+        await supabase.auth.signOut();
+        return;
+      }
+
+      navigate("/dashboard");
+      toast.success("Welcome back!");
+    } catch (error: any) {
+      console.error('Error logging in:', error);
+      toast.error(error.message || "Failed to login. Please try again.");
     } finally {
       setLoading(false);
     }
