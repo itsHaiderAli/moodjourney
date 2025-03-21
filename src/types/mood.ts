@@ -7,6 +7,7 @@ export interface MoodEntry {
   note?: string;
   mood_name?: string;
   tags?: MoodTag[];
+  created_at?: string; // Adding this field to fix ExportReports.tsx error
 }
 
 export interface MoodTag {

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { MoodGoal } from "@/types/mood";
@@ -52,11 +51,12 @@ const sampleGoals: MoodGoal[] = [
     start_date: new Date().toISOString(),
     end_date: addDays(new Date(), 14).toISOString(),
     completed: false,
-    created_at: subDays(new Date(), 2).toISOString(),
-    updated_at: subDays(new Date(), 2).toISOString()
+    created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    updated_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
   }
 ];
 
+// Helper function to subtract days from a date and return ISO string
 function subDays(date: Date, days: number) {
   return new Date(date.getTime() - days * 24 * 60 * 60 * 1000).toISOString();
 }

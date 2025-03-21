@@ -60,7 +60,9 @@ const ExportReports = () => {
       
       // Filter entries based on date range
       return entries.filter((entry: MoodEntry) => {
-        const entryDate = new Date(entry.created_at);
+        // If created_at is missing, use current date as fallback
+        const entryCreatedAt = entry.created_at || new Date().toISOString();
+        const entryDate = new Date(entryCreatedAt);
         return entryDate >= startDate && entryDate <= now;
       });
     } catch (error) {
@@ -88,8 +90,13 @@ const ExportReports = () => {
     let csvContent = headers.join(",") + "\n";
     
     data.forEach(entry => {
+      // Use entry.date if created_at is missing
+      const entryDate = entry.created_at 
+        ? format(new Date(entry.created_at), "yyyy-MM-dd") 
+        : entry.date;
+        
       const row = [
-        format(new Date(entry.created_at), "yyyy-MM-dd"),
+        entryDate,
         entry.mood_name,
         entry.mood,
         entry.energy
