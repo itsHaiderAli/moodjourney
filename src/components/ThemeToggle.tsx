@@ -1,17 +1,5 @@
 
-import { Button } from "@/components/ui/button";
-import { Moon } from "lucide-react";
-
+// This component is empty as the moon icon has been removed
 export function ThemeToggle() {
-  return (
-    <Button
-      variant="ghost"
-      size="icon"
-      className="rounded-full"
-      disabled
-    >
-      <Moon className="h-5 w-5" />
-      <span className="sr-only">Dark theme</span>
-    </Button>
-  );
+  return null;
 }

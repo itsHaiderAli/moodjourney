@@ -42,3 +42,12 @@ export interface MoodGoal {
   updated_at: string;
   progress?: number;
 }
+
+export type MoodName = 
+  | 'happy' 
+  | 'sad' 
+  | 'angry' 
+  | 'excited' 
+  | 'calm'
+  | 'anxious'
+  | 'tired';
