@@ -229,24 +229,30 @@ const MoodChart = ({ moodHistory, loading }: MoodChartProps) => {
             size="sm" 
             onClick={() => setChartType('area')}
           >
-            <LayoutDashboard className="h-4 w-4 mr-1" />
-            <span>Area</span>
+            <span className="flex items-center">
+              <LayoutDashboard className="h-4 w-4 mr-1" />
+              Area
+            </span>
           </Button>
           <Button 
             variant={chartType === 'line' ? 'default' : 'outline'} 
             size="sm" 
             onClick={() => setChartType('line')}
           >
-            <LineChartIcon className="h-4 w-4 mr-1" />
-            <span>Line</span>
+            <span className="flex items-center">
+              <LineChartIcon className="h-4 w-4 mr-1" />
+              Line
+            </span>
           </Button>
           <Button 
             variant={chartType === 'bar' ? 'default' : 'outline'} 
             size="sm" 
             onClick={() => setChartType('bar')}
           >
-            <BarChartIcon className="h-4 w-4 mr-1" />
-            <span>Bar</span>
+            <span className="flex items-center">
+              <BarChartIcon className="h-4 w-4 mr-1" />
+              Bar
+            </span>
           </Button>
         </div>
       </CardFooter>
