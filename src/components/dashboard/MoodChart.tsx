@@ -9,7 +9,11 @@ import {
   ResponsiveContainer,
   Legend,
   CartesianGrid,
-  ReferenceLine 
+  ReferenceLine,
+  LineChart,
+  Line,
+  BarChart,
+  Bar
 } from 'recharts';
 import {
   Card,
@@ -28,7 +32,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { MoodEntry } from "@/types/mood";
-import { LineChart, LayoutDashboard, BarChart } from "lucide-react";
+import { LineChart as LineChartIcon, LayoutDashboard, BarChart as BarChartIcon } from "lucide-react";
 
 interface MoodChartProps {
   moodHistory: MoodEntry[];
@@ -156,19 +160,17 @@ const MoodChart = ({ moodHistory, loading }: MoodChartProps) => {
             <Tooltip content={<CustomTooltip />} />
             <Legend />
             <ReferenceLine y={5} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
-            <Area 
+            <Line 
               type="monotone" 
               dataKey="mood" 
               name="Mood"
               stroke="hsl(var(--primary))" 
-              fill="none" 
             />
-            <Area 
+            <Line 
               type="monotone" 
               dataKey="energy" 
               name="Energy"
               stroke="hsl(var(--secondary))" 
-              fill="none" 
             />
           </LineChart>
         )}
@@ -180,14 +182,12 @@ const MoodChart = ({ moodHistory, loading }: MoodChartProps) => {
             <YAxis domain={[0, 10]} />
             <Tooltip content={<CustomTooltip />} />
             <Legend />
-            <Area 
-              type="monotone" 
+            <Bar 
               dataKey="mood" 
               name="Mood"
               fill="hsl(var(--primary))" 
             />
-            <Area 
-              type="monotone" 
+            <Bar 
               dataKey="energy" 
               name="Energy"
               fill="hsl(var(--secondary))" 
@@ -230,23 +230,23 @@ const MoodChart = ({ moodHistory, loading }: MoodChartProps) => {
             onClick={() => setChartType('area')}
           >
             <LayoutDashboard className="h-4 w-4 mr-1" />
-            Area
+            <span>Area</span>
           </Button>
           <Button 
             variant={chartType === 'line' ? 'default' : 'outline'} 
             size="sm" 
             onClick={() => setChartType('line')}
           >
-            <LineChart className="h-4 w-4 mr-1" />
-            Line
+            <LineChartIcon className="h-4 w-4 mr-1" />
+            <span>Line</span>
           </Button>
           <Button 
             variant={chartType === 'bar' ? 'default' : 'outline'} 
             size="sm" 
             onClick={() => setChartType('bar')}
           >
-            <BarChart className="h-4 w-4 mr-1" />
-            Bar
+            <BarChartIcon className="h-4 w-4 mr-1" />
+            <span>Bar</span>
           </Button>
         </div>
       </CardFooter>
