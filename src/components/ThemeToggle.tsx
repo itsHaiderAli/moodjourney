@@ -1,5 +1,7 @@
 
-// This component is empty as the moon icon has been removed
-export function ThemeToggle() {
+// ThemeToggle component with moon icon removed
+const ThemeToggle = () => {
   return null;
-}
+};
+
+export default ThemeToggle;
