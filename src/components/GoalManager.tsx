@@ -1,7 +1,6 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
 import { MoodGoal } from "@/types/mood";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,7 +27,39 @@ import {
 } from "@/components/ui/dialog";
 import { format, parseISO, isAfter, addDays } from "date-fns";
 import { Progress } from "@/components/ui/progress";
-import { Award, Calendar, Check, Plus, Trash, X } from "lucide-react";
+import { Award, Calendar, Check, Plus, Trash } from "lucide-react";
+
+// Sample goals data
+const sampleGoals: MoodGoal[] = [
+  {
+    id: "1",
+    user_id: "mock-user-id",
+    title: "Improve overall mood",
+    description: "Focus on self-care and relaxation",
+    target_mood: 7,
+    start_date: new Date().toISOString(),
+    end_date: addDays(new Date(), 7).toISOString(),
+    completed: false,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  },
+  {
+    id: "2",
+    user_id: "mock-user-id",
+    title: "Reduce stress from work",
+    description: "Practice meditation daily",
+    target_mood: 8,
+    start_date: new Date().toISOString(),
+    end_date: addDays(new Date(), 14).toISOString(),
+    completed: false,
+    created_at: subDays(new Date(), 2).toISOString(),
+    updated_at: subDays(new Date(), 2).toISOString()
+  }
+];
+
+function subDays(date: Date, days: number) {
+  return new Date(date.getTime() - days * 24 * 60 * 60 * 1000).toISOString();
+}
 
 interface GoalCardProps {
   goal: MoodGoal;
@@ -126,14 +157,17 @@ const GoalManager = ({ averageMood }: { averageMood: number }) => {
   const fetchGoals = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from("mood_goals")
-        .select("*")
-        .eq("user_id", user?.id)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      setGoals(data as MoodGoal[]);
+      
+      // Try to get stored goals from localStorage
+      const storedGoals = localStorage.getItem("moodGoals");
+      let goalsData = storedGoals ? JSON.parse(storedGoals) : sampleGoals;
+      
+      // First time, initialize with sample data and save to localStorage
+      if (!storedGoals) {
+        localStorage.setItem("moodGoals", JSON.stringify(sampleGoals));
+      }
+      
+      setGoals(goalsData);
     } catch (error) {
       console.error("Error fetching goals:", error);
       toast.error("Failed to load goals");
@@ -149,24 +183,27 @@ const GoalManager = ({ averageMood }: { averageMood: number }) => {
       const start_date = new Date().toISOString();
       const end_date = addDays(new Date(), duration).toISOString();
       
-      const { data, error } = await supabase
-        .from("mood_goals")
-        .insert([
-          {
-            user_id: user?.id,
-            title: title.trim(),
-            description: description.trim() || null,
-            target_mood: targetMood[0],
-            start_date,
-            end_date
-          }
-        ])
-        .select()
-        .single();
-
-      if (error) throw error;
+      // Create new goal
+      const newGoal: MoodGoal = {
+        id: `local-${Date.now()}`,
+        user_id: user?.id || "mock-user-id",
+        title: title.trim(),
+        description: description.trim() || "",
+        target_mood: targetMood[0],
+        start_date,
+        end_date,
+        completed: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
       
-      setGoals([data as MoodGoal, ...goals]);
+      // Add to goals array
+      const updatedGoals = [newGoal, ...goals];
+      setGoals(updatedGoals);
+      
+      // Save to localStorage
+      localStorage.setItem("moodGoals", JSON.stringify(updatedGoals));
+      
       setTitle("");
       setDescription("");
       setTargetMood([7]);
@@ -181,16 +218,15 @@ const GoalManager = ({ averageMood }: { averageMood: number }) => {
 
   const completeGoal = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from("mood_goals")
-        .update({ completed: true })
-        .eq("id", id);
-
-      if (error) throw error;
+      // Update goal status
+      const updatedGoals = goals.map(goal => 
+        goal.id === id ? { ...goal, completed: true, updated_at: new Date().toISOString() } : goal
+      );
       
-      setGoals(goals.map(goal => 
-        goal.id === id ? { ...goal, completed: true } : goal
-      ));
+      setGoals(updatedGoals);
+      
+      // Save to localStorage
+      localStorage.setItem("moodGoals", JSON.stringify(updatedGoals));
       
       toast.success("Goal marked as complete!");
     } catch (error) {
@@ -201,14 +237,13 @@ const GoalManager = ({ averageMood }: { averageMood: number }) => {
 
   const deleteGoal = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from("mood_goals")
-        .delete()
-        .eq("id", id);
-
-      if (error) throw error;
+      // Remove goal
+      const updatedGoals = goals.filter(goal => goal.id !== id);
+      setGoals(updatedGoals);
       
-      setGoals(goals.filter(goal => goal.id !== id));
+      // Save to localStorage
+      localStorage.setItem("moodGoals", JSON.stringify(updatedGoals));
+      
       toast.success("Goal deleted successfully!");
     } catch (error) {
       console.error("Error deleting goal:", error);

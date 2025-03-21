@@ -2,9 +2,39 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { MoodEntry } from "@/types/mood";
-import { supabase } from "@/integrations/supabase/client";
 import { format, parseISO, subDays } from "date-fns";
 import { toast } from "sonner";
+
+// Demo mood data
+const demoMoodEntries: MoodEntry[] = [
+  {
+    id: "1",
+    date: format(subDays(new Date(), 0), "MMM dd"),
+    mood: 8,
+    energy: 7,
+    note: "Had a productive day at work",
+    mood_name: "happy",
+    tags: [{ id: "1", name: "work", category: "activity", user_id: "mock-user-id", created_at: new Date().toISOString() }]
+  },
+  {
+    id: "2",
+    date: format(subDays(new Date(), 1), "MMM dd"),
+    mood: 6,
+    energy: 5,
+    note: "Rainy weather, stayed indoors",
+    mood_name: "calm",
+    tags: [{ id: "2", name: "weather", category: "weather", user_id: "mock-user-id", created_at: new Date().toISOString() }]
+  },
+  {
+    id: "3",
+    date: format(subDays(new Date(), 2), "MMM dd"),
+    mood: 9,
+    energy: 8,
+    note: "Great workout and meditation session",
+    mood_name: "excited",
+    tags: [{ id: "3", name: "exercise", category: "activity", user_id: "mock-user-id", created_at: new Date().toISOString() }]
+  },
+];
 
 export const useMoodData = () => {
   const { user } = useAuth();
@@ -24,55 +54,17 @@ export const useMoodData = () => {
     try {
       setLoading(true);
       
-      const { data, error } = await supabase
-        .from('mood_entries')
-        .select('*')
-        .eq('user_id', user?.id)
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      if (error) throw error;
-
-      // Fetch tags for each mood entry
-      const entryIds = data.map(entry => entry.id);
+      // Try to get stored mood entries from localStorage
+      const storedEntries = localStorage.getItem("moodEntries");
+      let entries = storedEntries ? JSON.parse(storedEntries) : demoMoodEntries;
       
-      const { data: tagRelations, error: tagRelError } = await supabase
-        .from('mood_entry_tags')
-        .select('mood_entry_id, tag_id')
-        .in('mood_entry_id', entryIds);
-        
-      if (tagRelError) throw tagRelError;
+      // First time, initialize with demo data and save to localStorage
+      if (!storedEntries) {
+        localStorage.setItem("moodEntries", JSON.stringify(demoMoodEntries));
+      }
       
-      const tagIds = tagRelations.map(rel => rel.tag_id);
-      
-      const { data: tags, error: tagsError } = await supabase
-        .from('mood_tags')
-        .select('*')
-        .in('id', tagIds);
-        
-      if (tagsError) throw tagsError;
-
-      // Add tags to each entry
-      const entriesWithTags = data.map(entry => {
-        const entryTagIds = tagRelations
-          .filter(rel => rel.mood_entry_id === entry.id)
-          .map(rel => rel.tag_id);
-          
-        const entryTags = tags.filter(tag => entryTagIds.includes(tag.id));
-        
-        return {
-          id: entry.id,
-          date: format(parseISO(entry.created_at), "MMM dd"),
-          mood: entry.intensity,
-          energy: entry.energy,
-          note: entry.note,
-          mood_name: entry.mood,
-          tags: entryTags
-        };
-      });
-
-      setMoodHistory(entriesWithTags);
-      updateStats(entriesWithTags);
+      setMoodHistory(entries);
+      updateStats(entries);
     } catch (error) {
       console.error('Error fetching mood entries:', error);
       toast.error("Failed to load mood entries");

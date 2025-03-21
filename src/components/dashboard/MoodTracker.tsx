@@ -19,9 +19,9 @@ import {
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 import { MoodTag } from "@/types/mood";
 import TagsInput from "@/components/TagsInput";
+import { format } from "date-fns";
 
 interface MoodTrackerProps {
   onSubmitSuccess: () => void;
@@ -47,36 +47,30 @@ const MoodTracker = ({ onSubmitSuccess }: MoodTrackerProps) => {
     try {
       setSubmitting(true);
       
-      // First create the mood entry
-      const { data, error } = await supabase
-        .from('mood_entries')
-        .insert([
-          { 
-            user_id: user.id,
-            mood: mood,
-            intensity: intensity[0],
-            energy: energyLevel[0],
-            note: note
-          }
-        ])
-        .select();
-
-      if (error) throw error;
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      // If there are selected tags, create the relationships
-      if (selectedTags.length > 0 && data && data[0]) {
-        const entryId = data[0].id;
-        const tagRelations = selectedTags.map(tag => ({
-          mood_entry_id: entryId,
-          tag_id: tag.id
-        }));
-        
-        const { error: tagError } = await supabase
-          .from('mood_entry_tags')
-          .insert(tagRelations);
-          
-        if (tagError) throw tagError;
-      }
+      // Get existing entries
+      const storedEntries = localStorage.getItem("moodEntries") || "[]";
+      const entries = JSON.parse(storedEntries);
+      
+      // Add new entry
+      const newEntry = {
+        id: `local-${Date.now()}`,
+        date: format(new Date(), "MMM dd"),
+        mood: intensity[0],
+        energy: energyLevel[0],
+        mood_name: mood,
+        note: note,
+        tags: selectedTags,
+        created_at: new Date().toISOString()
+      };
+      
+      // Add to beginning of array
+      entries.unshift(newEntry);
+      
+      // Save back to localStorage
+      localStorage.setItem("moodEntries", JSON.stringify(entries));
       
       toast.success("Mood logged successfully!");
       

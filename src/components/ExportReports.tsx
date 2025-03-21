@@ -1,7 +1,6 @@
 
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -19,7 +18,7 @@ import {
 } from "@/components/ui/select";
 import { MoodEntry } from "@/types/mood";
 import { toast } from "sonner";
-import { format, parseISO, subDays, subWeeks, subMonths } from "date-fns";
+import { format, subDays, subWeeks, subMonths } from "date-fns";
 import { Download, FileText, Loader2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -51,51 +50,19 @@ const ExportReports = () => {
         startDate = subDays(now, 1);
       }
       
-      // Format date for Supabase query
-      const startDateStr = startDate.toISOString();
-      
-      // Fetch mood entries
-      const { data: moodEntries, error: moodError } = await supabase
-        .from("mood_entries")
-        .select("*")
-        .eq("user_id", user?.id)
-        .gte("created_at", startDateStr)
-        .order("created_at", { ascending: false });
-        
-      if (moodError) throw moodError;
-      
-      // Fetch tags if requested
-      let entriesWithTags = [...moodEntries];
-      
-      if (includeTags) {
-        const { data: tagRelations, error: tagRelError } = await supabase
-          .from("mood_entry_tags")
-          .select("mood_entry_id, tag_id");
-          
-        if (tagRelError) throw tagRelError;
-        
-        const { data: tags, error: tagsError } = await supabase
-          .from("mood_tags")
-          .select("*");
-          
-        if (tagsError) throw tagsError;
-        
-        // Add tags to each entry
-        entriesWithTags = moodEntries.map(entry => {
-          const entryTagIds = tagRelations
-            .filter(rel => rel.mood_entry_id === entry.id)
-            .map(rel => rel.tag_id);
-            
-          const entryTags = tags.filter(tag => entryTagIds.includes(tag.id));
-          
-          return {
-            ...entry,
-            tags: entryTags
-          };
-        });
+      // Get stored entries from localStorage
+      const storedEntries = localStorage.getItem("moodEntries");
+      if (!storedEntries) {
+        return [];
       }
       
-      return entriesWithTags;
+      const entries = JSON.parse(storedEntries);
+      
+      // Filter entries based on date range
+      return entries.filter((entry: MoodEntry) => {
+        const entryDate = new Date(entry.created_at);
+        return entryDate >= startDate && entryDate <= now;
+      });
     } catch (error) {
       console.error("Error fetching mood data:", error);
       toast.error("Failed to fetch mood data for export");
@@ -122,9 +89,9 @@ const ExportReports = () => {
     
     data.forEach(entry => {
       const row = [
-        format(parseISO(entry.created_at), "yyyy-MM-dd"),
+        format(new Date(entry.created_at), "yyyy-MM-dd"),
+        entry.mood_name,
         entry.mood,
-        entry.intensity,
         entry.energy
       ];
       
@@ -198,12 +165,12 @@ const ExportReports = () => {
             <SelectTrigger>
               <SelectValue placeholder="Select time period" />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="day">Last 24 Hours</SelectItem>
-              <SelectItem value="week">Last Week</SelectItem>
-              <SelectItem value="month">Last Month</SelectItem>
-              <SelectItem value="3months">Last 3 Months</SelectItem>
-              <SelectItem value="year">Last Year</SelectItem>
+            <SelectContent className="bg-background border-border">
+              <SelectItem value="day" className="hover:bg-accent">Last 24 Hours</SelectItem>
+              <SelectItem value="week" className="hover:bg-accent">Last Week</SelectItem>
+              <SelectItem value="month" className="hover:bg-accent">Last Month</SelectItem>
+              <SelectItem value="3months" className="hover:bg-accent">Last 3 Months</SelectItem>
+              <SelectItem value="year" className="hover:bg-accent">Last Year</SelectItem>
             </SelectContent>
           </Select>
         </div>

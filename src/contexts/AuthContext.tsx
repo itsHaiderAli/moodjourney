@@ -1,11 +1,21 @@
+
 import { createContext, useContext, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
+interface User {
+  id: string;
+  email: string;
+}
+
+interface Profile {
+  id: string;
+  username: string;
+}
+
 interface AuthContextType {
-  user: any | null;
-  profile: any | null;
+  user: User | null;
+  profile: Profile | null;
   login: (data: LoginData) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
@@ -23,81 +33,45 @@ interface RegisterData {
   password: string;
 }
 
+// Mock user and profile data
+const MOCK_USER: User = {
+  id: "mock-user-id-123",
+  email: "demo@example.com",
+};
+
+const MOCK_PROFILE: Profile = {
+  id: "mock-user-id-123",
+  username: "Demo User",
+};
+
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<any | null>(null);
-  const [profile, setProfile] = useState<any | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
+  // Check local storage for user data on mount
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (session) {
-          setUser(session.user);
-          await fetchProfile(session.user.id);
-        } else {
-          setUser(null);
-          setProfile(null);
-        }
-        setLoading(false);
-      }
-    );
-
-    // Initial session check
-    checkUser();
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  async function checkUser() {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
-      setUser(session.user);
-      await fetchProfile(session.user.id);
+    const storedUser = localStorage.getItem("mockUser");
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+      setProfile(MOCK_PROFILE);
     }
     setLoading(false);
-  }
-
-  async function fetchProfile(userId: string) {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (error) throw error;
-      setProfile(data);
-    } catch (error) {
-      console.error('Error fetching profile:', error);
-    }
-  }
+  }, []);
 
   const register = async (data: RegisterData) => {
     try {
       setLoading(true);
-      const { error } = await supabase.auth.signUp({
-        email: data.email,
-        password: data.password,
-        options: {
-          data: {
-            username: data.username,
-          },
-          emailRedirectTo: `${window.location.origin}/dashboard`,
-        },
-      });
-
-      if (error) throw error;
+      // Simulate registration delay
+      await new Promise(resolve => setTimeout(resolve, 800));
       
-      toast.success("Registration successful! Please check your email to verify your account.");
-      // Don't navigate to dashboard immediately - wait for email verification
+      toast.success("Registration successful! You can now log in.");
     } catch (error: any) {
       console.error('Error registering:', error);
-      toast.error(error.message || "Failed to register. Please try again.");
+      toast.error("Failed to register. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -106,24 +80,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const login = async (data: LoginData) => {
     try {
       setLoading(true);
-      const { error, data: authData } = await supabase.auth.signInWithPassword({
-        email: data.email,
-        password: data.password,
-      });
-
-      if (error) throw error;
-
-      if (!authData.user?.email_confirmed_at) {
-        toast.error("Please verify your email before logging in.");
-        await supabase.auth.signOut();
-        return;
-      }
-
+      // Simulate login delay
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      // Set mock user
+      setUser(MOCK_USER);
+      setProfile(MOCK_PROFILE);
+      localStorage.setItem("mockUser", JSON.stringify(MOCK_USER));
+      
       navigate("/dashboard");
       toast.success("Welcome back!");
     } catch (error: any) {
       console.error('Error logging in:', error);
-      toast.error(error.message || "Failed to login. Please try again.");
+      toast.error("Failed to login. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -132,13 +101,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const logout = async () => {
     try {
       setLoading(true);
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      setUser(null);
+      setProfile(null);
+      localStorage.removeItem("mockUser");
       navigate("/");
       toast.success("Logged out successfully");
     } catch (error: any) {
       console.error('Error logging out:', error);
-      toast.error(error.message || "Failed to logout");
+      toast.error("Failed to logout");
     } finally {
       setLoading(false);
     }

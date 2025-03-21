@@ -10,8 +10,7 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
-import { X, Plus, Tag } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { X, Plus } from "lucide-react";
 import { MoodTag, TagCategory } from "@/types/mood";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -20,6 +19,16 @@ interface TagsInputProps {
   selectedTags: MoodTag[];
   onTagsChange: (tags: MoodTag[]) => void;
 }
+
+// Sample tags data
+const sampleTags: MoodTag[] = [
+  { id: "1", name: "work", category: "activity", user_id: "mock-user-id", created_at: new Date().toISOString() },
+  { id: "2", name: "exercise", category: "activity", user_id: "mock-user-id", created_at: new Date().toISOString() },
+  { id: "3", name: "friends", category: "social", user_id: "mock-user-id", created_at: new Date().toISOString() },
+  { id: "4", name: "family", category: "social", user_id: "mock-user-id", created_at: new Date().toISOString() },
+  { id: "5", name: "rain", category: "weather", user_id: "mock-user-id", created_at: new Date().toISOString() },
+  { id: "6", name: "stress", category: "health", user_id: "mock-user-id", created_at: new Date().toISOString() },
+];
 
 const TagsInput = ({ selectedTags, onTagsChange }: TagsInputProps) => {
   const { user } = useAuth();
@@ -37,13 +46,17 @@ const TagsInput = ({ selectedTags, onTagsChange }: TagsInputProps) => {
   const fetchTags = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from("mood_tags")
-        .select("*")
-        .eq("user_id", user?.id);
-
-      if (error) throw error;
-      setTags(data as MoodTag[]);
+      
+      // Try to get stored tags from localStorage
+      const storedTags = localStorage.getItem("moodTags");
+      let tagsData = storedTags ? JSON.parse(storedTags) : sampleTags;
+      
+      // First time, initialize with sample data and save to localStorage
+      if (!storedTags) {
+        localStorage.setItem("moodTags", JSON.stringify(sampleTags));
+      }
+      
+      setTags(tagsData);
     } catch (error) {
       console.error("Error fetching tags:", error);
       toast.error("Failed to load tags");
@@ -56,21 +69,22 @@ const TagsInput = ({ selectedTags, onTagsChange }: TagsInputProps) => {
     if (!newTagName.trim()) return;
     
     try {
-      const { data, error } = await supabase
-        .from("mood_tags")
-        .insert([
-          {
-            user_id: user?.id,
-            name: newTagName.trim(),
-            category: newTagCategory
-          }
-        ])
-        .select()
-        .single();
-
-      if (error) throw error;
+      // Create new tag
+      const newTag: MoodTag = {
+        id: `local-${Date.now()}`,
+        name: newTagName.trim(),
+        category: newTagCategory,
+        user_id: user?.id || "mock-user-id",
+        created_at: new Date().toISOString()
+      };
       
-      setTags([...tags, data as MoodTag]);
+      // Add to tags array
+      const updatedTags = [...tags, newTag];
+      setTags(updatedTags);
+      
+      // Save to localStorage
+      localStorage.setItem("moodTags", JSON.stringify(updatedTags));
+      
       setNewTagName("");
       toast.success("Tag created successfully!");
     } catch (error) {
@@ -149,7 +163,7 @@ const TagsInput = ({ selectedTags, onTagsChange }: TagsInputProps) => {
           <SelectTrigger className="w-[140px]">
             <SelectValue placeholder="Category" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="bg-background border-border">
             <SelectItem value="activity">Activity</SelectItem>
             <SelectItem value="person">Person</SelectItem>
             <SelectItem value="location">Location</SelectItem>
