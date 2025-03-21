@@ -40,9 +40,12 @@ const MoodChartRenderer = ({ chartType, data, loading }: MoodChartRendererProps)
     );
   }
   
+  // The issue is likely with the ResponsiveContainer's children
+  // ResponsiveContainer expects a single child element, so we need to use a fragment or conditional rendering
   return (
     <ResponsiveContainer width="100%" height="100%">
-      {chartType === 'area' && (
+      {/* Rendering a single chart based on the chartType */}
+      {chartType === 'area' ? (
         <AreaChart data={data}>
           <defs>
             <linearGradient id="colorMood" x1="0" y1="0" x2="0" y2="1">
@@ -77,9 +80,7 @@ const MoodChartRenderer = ({ chartType, data, loading }: MoodChartRendererProps)
             fill="url(#colorEnergy)" 
           />
         </AreaChart>
-      )}
-      
-      {chartType === 'line' && (
+      ) : chartType === 'line' ? (
         <LineChart data={data}>
           <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
           <XAxis dataKey="date" />
@@ -100,9 +101,7 @@ const MoodChartRenderer = ({ chartType, data, loading }: MoodChartRendererProps)
             stroke="hsl(var(--secondary))" 
           />
         </LineChart>
-      )}
-      
-      {chartType === 'bar' && (
+      ) : (
         <BarChart data={data}>
           <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
           <XAxis dataKey="date" />
